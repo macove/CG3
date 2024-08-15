@@ -40,13 +40,11 @@ enum blendMode {
 	kBlendModeNormal,
 	kBlendModeAdd,
 	kBlendModeSubtract,
-	kBlendModeMultily,
+	kBlendModeMultiply,
 	kBlendModeScreen,
 	kCountOfBlendModeNone,
 
 };
-
-
 
 Math* math = new Math();
 
@@ -858,17 +856,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//	D3D12_COLOR_WRITE_ENABLE_ALL;
 
 
-
+	//Blend
 	D3D12_BLEND_DESC blendDesc{};
+	
+
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+
+	blendMode blend = kBlendModeNormal;
+
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
-
 
 	//RasterizerState
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
@@ -894,6 +897,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexShaderBlob->GetBufferSize() };
 	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
 	pixelShaderBlob->GetBufferSize() };
+
 	graphicsPipelineStateDesc.BlendState = blendDesc;
 	graphicsPipelineStateDesc.RasterizerState = rasterizerDesc;
 
@@ -1076,6 +1080,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+		ImGui::Begin("Window");
 		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
 		ImGui::SliderFloat3("direction", &directionalLightData->direction.x, 0.1f,1.0f);
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
@@ -1086,6 +1091,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 		ImGui::DragFloat2("UvScale" ,&uvTransformSprite.scale.x, 0.0f, -10.0f, 10.0f);
 		ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+		ImGui::End();
+		ImGui::Begin("Blend");
+		static int currentBlendMode = kBlendModeNone;
+		const char* blendModeNames[] = {
+			"None",
+			"Normal",
+			"Add",
+			"Subtract",
+			"Multiply",
+			"Screen",
+			"CountOfBlendModeNone"
+		};
+		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
+		if (ImGui::Combo("Blend Mode", &currentBlendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
+			
+			printf("Selected Blend Mode: %s\n", blendModeNames[currentBlendMode]);
+		}
+		ImGui::End();
 		ImGui::Render();
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
