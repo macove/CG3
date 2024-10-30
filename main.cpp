@@ -7,7 +7,7 @@
 #include<cassert>
 #include<dxgidebug.h>
 #include <dxcapi.h>
-#include"Math.h"
+#include"MyMath.h"
 #include "Vector2.h"
 #include <cmath>
 #include"Matrix3x3.h"
@@ -34,7 +34,7 @@ using Microsoft::WRL::ComPtr;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-enum blendMode {
+enum blendModes {
 
 	kBlendModeNone,
 	kBlendModeNormal,
@@ -46,7 +46,7 @@ enum blendMode {
 
 };
 
-Math* math = new Math();
+MyMath* math = new MyMath();
 
 struct Vector4 final {
 	float x;
@@ -111,6 +111,7 @@ struct D3DResourceLeakChecker {
 		}
 	}
 };
+
 
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f} ,{0.0f,0.0f,-10.0f} };
@@ -501,7 +502,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	D3DResourceLeakChecker leakCheck;
-	
+
 	//COMの初期化
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
@@ -677,11 +678,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	swapChainDesc.BufferCount = 2;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	hr = dxgiFactory->CreateSwapChainForHwnd(
-		commandQueue.Get(), 
-		hwnd, 
-		&swapChainDesc, 
-		nullptr, 
-		nullptr, 
+		commandQueue.Get(),
+		hwnd,
+		&swapChainDesc,
+		nullptr,
+		nullptr,
 		reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
@@ -706,6 +707,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	UploadTextureDate(textureResource2, mipImages2);
 
 
+	
+
 	//metadataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
 	srvDesc.Format = metadata.format;
@@ -718,7 +721,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
-	
+
 
 	//SRVを作成するDescriptorHeapの場所を決める
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -774,34 +777,75 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
 	assert(SUCCEEDED(hr));
 
-	//DescriptorRange
-	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
-	descriptorRange[0].BaseShaderRegister = 0;
-	descriptorRange[0].NumDescriptors = 1;
-	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	////DescriptorRange
+	//D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
+	//descriptorRange[0].BaseShaderRegister = 0;
+	//descriptorRange[0].NumDescriptors = 1;
+	//descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	//descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	//
+	////RootSignature作成
+	//D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
+	//descriptionRootSignature.Flags =
+	//	D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	////複数設定できるので配列。今回は結果１つだけなので長さ1の配列
+	//D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	//rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
+	//rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	//rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+	//rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
+	//rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; //VertexShaderで使う
+	//rootParameters[1].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+	//rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; //DescriptorTableを使う
+	//rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	//rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange; //Tableの中身の配列の指定
+	//rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange); //Tableで利用する数
+	//rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
+	//rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	//rootParameters[3].Descriptor.ShaderRegister = 1; //レジスタ番号1
+	//descriptionRootSignature.pParameters = rootParameters; //rootParameters配列へのポインタ
+	//descriptionRootSignature.NumParameters = _countof(rootParameters); //配列の長さ
+
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+	descriptorRangeForInstancing[0].NumDescriptors = 1;
+	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 
 	//RootSignature作成
-	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-	descriptionRootSignature.Flags =
+	D3D12_ROOT_SIGNATURE_DESC particleDescriptionRootSignature{};
+	particleDescriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	//複数設定できるので配列。今回は結果１つだけなので長さ1の配列
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
-	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; //VertexShaderで使う
-	rootParameters[1].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; //DescriptorTableを使う
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
-	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange; //Tableの中身の配列の指定
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange); //Tableで利用する数
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
-	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
-	rootParameters[3].Descriptor.ShaderRegister = 1; //レジスタ番号1
-	descriptionRootSignature.pParameters = rootParameters; //rootParameters配列へのポインタ
-	descriptionRootSignature.NumParameters = _countof(rootParameters); //配列の長さ
+	D3D12_ROOT_PARAMETER particleRootParameters[3] = {};
+	particleRootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
+	particleRootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	particleRootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+
+	particleRootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	particleRootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; ///VertexShaderで使う
+	particleRootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	particleRootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+
+	particleRootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; //DescriptorTableを使う
+	particleRootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	particleRootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	particleRootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+
+	particleDescriptionRootSignature.pParameters = particleRootParameters; //rootParameters配列へのポインタ
+	particleDescriptionRootSignature.NumParameters = _countof(particleRootParameters); //配列の長さ
+
+
+	//particleRootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
+	//particleRootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; ///VertexShaderで使う
+	//particleRootParameters[1].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+	//
+	//particleRootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	//particleRootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
+	//particleRootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	//particleRootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+
 
 	//Sampler
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
@@ -813,13 +857,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
 	staticSamplers[0].ShaderRegister = 0;
 	staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	descriptionRootSignature.pStaticSamplers = staticSamplers;
-	descriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
+	particleDescriptionRootSignature.pStaticSamplers = staticSamplers;
+	particleDescriptionRootSignature.NumStaticSamplers = _countof(staticSamplers);
 
 	//シリアライズしてバイナリする
 	ComPtr<ID3DBlob> signatureBlob = nullptr;
 	ComPtr<ID3DBlob> errorBlob = nullptr;
-	hr = D3D12SerializeRootSignature(&descriptionRootSignature,
+	hr = D3D12SerializeRootSignature(&particleDescriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
 	if (FAILED(hr)) {
 		Log(reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
@@ -850,21 +894,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
 
-	//BlendState
-	//D3D12_BLEND_DESC blendDesc{};
-	//blendDesc.RenderTarget[0].RenderTargetWriteMask =
-	//	D3D12_COLOR_WRITE_ENABLE_ALL;
-
 
 	//Blend
 	D3D12_BLEND_DESC blendDesc{};
 	
-
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-
-	blendMode blend = kBlendModeNormal;
-
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
@@ -873,6 +908,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
+
 	//RasterizerState
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	//rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -880,11 +916,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
 	//Shader Compile
-	ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"resources/shaders/Object3D.VS.hlsl",
+	ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"resources/shaders/Particle.VS.hlsl",
 		L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(vertexShaderBlob != nullptr);
 
-	ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"resources/shaders/Object3D.PS.hlsl",
+	ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"resources/shaders/Particle.PS.hlsl",
 		L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(pixelShaderBlob != nullptr);
 
@@ -936,16 +972,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	
     //model
-    ModelData modelData = LoadObjFile("resources", "axis.obj");
-	ResourceObject vertexResoure = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData.vertices.size());
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	vertexBufferView.BufferLocation = vertexResoure.Get()->GetGPUVirtualAddress();
-	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
-
-	VertexData* vertexData = nullptr;
-	vertexResoure.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
+    //ModelData modelData = LoadObjFile("resources", "axis.obj");
+	//ResourceObject vertexResoure = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData.vertices.size());
+	//D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	//vertexBufferView.BufferLocation = vertexResoure.Get()->GetGPUVirtualAddress();
+	//vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+	//vertexBufferView.StrideInBytes = sizeof(VertexData);
+	//
+	//VertexData* vertexData = nullptr;
+	//vertexResoure.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	//std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
 
 	//Lighting
 
@@ -987,6 +1023,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialDate->color = { 1.0f,1.0f,1.0f,1.0f };
 	materialDate->enableLighting = true;
 
+	materialDate->color = directionalLightData->color;
+
 	//TransformationMatrix Resource
 	ResourceObject wvpResoure = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	TransformationMatrix* transformationMatrix = nullptr;
@@ -1015,10 +1053,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexDataSprite[2].position = { 640.0f,360.0f,0.0f,1.0f };//lower right
 	vertexDataSprite[2].texCoord = { 1.0f,1.0f };
 	vertexDataSprite[2].normal = { 0.0f,0.0f, 1.0f };
-	vertexDataSprite[3].position = { 640.0f,0.0f,0.0f,1.0f };//upper left
-	vertexDataSprite[3].texCoord = { 1.0f,0.0f };
+	//second triangle
+	vertexDataSprite[3].position = { 0.0f,0.0f,0.0f,1.0f };//lower left
+	vertexDataSprite[3].texCoord = { 0.0f,0.0f };
 	vertexDataSprite[3].normal = { 0.0f,0.0f, 1.0f };
+	vertexDataSprite[4].position = { 640.0f,0.0f,0.0f,1.0f };//upper left
+	vertexDataSprite[4].texCoord = { 1.0f,0.0f };
+	vertexDataSprite[4].normal = { 0.0f,0.0f, 1.0f };
+	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };//lower right
+	vertexDataSprite[5].texCoord = { 1.0f,1.0f };
+	vertexDataSprite[5].normal = { 0.0f,0.0f, 1.0f };
 	
+
+	
+
 
 	ResourceObject indexResourceSprite = CreateBufferResource(device.Get(), sizeof(uint32_t) * 6);
 
@@ -1034,6 +1082,40 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	indexDataSprite[0] = 0; indexDataSprite[1] = 1; indexDataSprite[2] = 2;
 	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
 	
+	 
+	ModelData modelData;
+	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texCoord = {0.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texCoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.vertices.push_back({ .position = {1.0f,-1.0f,0.0f,1.0f},.texCoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.vertices.push_back({ .position = {1.0f,-1.0f,0.0f,1.0f},.texCoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texCoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texCoord = {1.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });
+	modelData.material.textureFilePath = "resources/uvChecker.png";
+
+	const uint32_t kNumInstance = 10;
+	ResourceObject instancingResoure =
+		CreateBufferResource(device.Get(), sizeof(TransformationMatrix) * kNumInstance);
+	
+	TransformationMatrix* instancingData = nullptr;
+	instancingResoure.Get()->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
+	for (uint32_t index = 0; index < kNumInstance; ++index) {
+		instancingData[index].WVP = math->MakeIdentity4x4();
+		instancingData[index].World = math->MakeIdentity4x4();
+	}
+	//new srv
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.FirstElement = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumInstance;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+	device->CreateShaderResourceView(instancingResoure.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+	
+	//device->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU);
 
 	ResourceObject materialResourceSprite = CreateBufferResource(device.Get(), sizeof(Material));
 
@@ -1045,9 +1127,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialDataSprite->enableLighting = false;
 
 	//UVTransform
-	materialDate->uvTransform = math->MakeIdentity4x4();
-	materialDataSprite->uvTransform = math->MakeIdentity4x4();
-
+	//materialDate->uvTransform = math->MakeIdentity4x4();
+	//materialDataSprite->uvTransform = math->MakeIdentity4x4();
+	
 	ResourceObject transformationMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
 	transformationMatrixResourceSprite.Get()->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite));
@@ -1056,8 +1138,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
-	
+	int currentBlendMode = 1;
+	int instanceCount = 10;
 
+	Transform transforms[kNumInstance];
+	for (uint32_t index = 0; index < kNumInstance; index++)
+	{
+		transforms[index].scale = { 1.0f,1.0f,1.0f };
+		transforms[index].rotate = { 0.0f,0.0f,0.0f };
+		transforms[index].translate = { index * 0.1f, index * 0.1f,index * 0.1f };
+	}
 
 
 	//ImGui初期化
@@ -1081,7 +1171,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 		ImGui::Begin("Window");
-		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
+		ImGui::ColorEdit4("directionalLight", &directionalLightData->color.x);
 		ImGui::SliderFloat3("direction", &directionalLightData->direction.x, 0.1f,1.0f);
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
 		ImGui::SliderFloat2("transform.rotate ", &transform.rotate.x, 0.0f, 6.28f);
@@ -1093,20 +1183,60 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 		ImGui::End();
 		ImGui::Begin("Blend");
-		static int currentBlendMode = kBlendModeNone;
 		const char* blendModeNames[] = {
-			"None",
-			"Normal",
-			"Add",
-			"Subtract",
-			"Multiply",
-			"Screen",
-			"CountOfBlendModeNone"
+	          "None",
+	          "Normal",
+	          "Add",
+	          "Subtract",
+	          "Multiply",
+	          "Screen"
 		};
-		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
+		
+		ImGui::ColorEdit4("Material", &materialDate->color.x);
 		if (ImGui::Combo("Blend Mode", &currentBlendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
 			
-			printf("Selected Blend Mode: %s\n", blendModeNames[currentBlendMode]);
+			switch (currentBlendMode)
+			{
+			case 0:
+				blendDesc.RenderTarget[0].BlendEnable = FALSE;
+				break;
+			case 1:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+				break;
+			case 2:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+				break;
+			case 3:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+				break;
+			case 4:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
+				break;
+			case 5:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_COLOR;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				break;
+			default:
+				break;
+			}
+			graphicsPipelineStateDesc.BlendState = blendDesc;
+
+			HRESULT hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
+			assert(SUCCEEDED(hr));
 		}
 		ImGui::End();
 		ImGui::Render();
@@ -1152,6 +1282,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
 			transformationMatrixDataSprite->World = worldViewProjectionMatrixSprite;
 			
+			Matrix4x4 viewProjectionMatrix = math->Multiply(viewMatrix, projectionMatrix);
+
+			for (uint32_t index = 0; index < kNumInstance; index++)
+			{
+				Matrix4x4 worldMatrix =
+					math->MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+				Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, viewProjectionMatrix);
+				instancingData[index].WVP = worldViewProjectionMatrix;
+				instancingData[index].World = worldMatrix;
+			}
+
 
 			//Resource State Transition
 			commandList->ResourceBarrier(1, &barrier);
@@ -1178,22 +1319,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetPipelineState(graphicsPipelineState.Get());
 
 			//Vertex Buffer Binding
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+			//commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			//commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			//commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
+			//commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-
-
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			//commandList->IASetIndexBuffer(&indexBufferViewSprite);
 			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite.Get()->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
+
+			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 			//commandList->DrawInstanced(6, 1, 0, 0);
-			//commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+			//commandList->DrawIndexedInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0, 0);
 
 
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
