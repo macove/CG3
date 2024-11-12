@@ -1021,8 +1021,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Material* materialDate = nullptr;
 	materialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
 	materialDate->color = { 1.0f,1.0f,1.0f,1.0f };
+	materialDate->uvTransform = math->MakeIdentity4x4();
 	//materialDate->enableLighting = true;
-
 	//materialDate->color = directionalLightData->color;
 
 	//TransformationMatrix Resource
@@ -1127,7 +1127,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//materialDataSprite->enableLighting = false;
 
 	//UVTransform
-	//materialDate->uvTransform = math->MakeIdentity4x4();
+	materialDate->uvTransform = math->MakeIdentity4x4();
 	//materialDataSprite->uvTransform = math->MakeIdentity4x4();
 	
 	//ResourceObject transformationMatrixResourceSprite = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
