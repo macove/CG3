@@ -25,6 +25,7 @@
 #include <sstream>
 #include "ResourceObject.h"
 #include "random"
+#include <numbers>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -130,8 +131,13 @@ struct D3DResourceLeakChecker {
 
 
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f} ,{0.0f,0.0f,-10.0f} };
 
+Transform cameraTransform{ 
+	{1.0f,1.0f,1.0f},
+	{(std::numbers::pi_v<float>/3.0f),std::numbers::pi_v<float>,0.0f} ,
+	{0.0f,0.0f,-10.0f} };
+
+Matrix4x4 backToFrontMatrix = math->MakeRotateYMatrix(std::numbers::pi_v<float>); 
 Transform uvTransformSprite
 {
 	{1.0f,1.0f,1.0f},
@@ -760,7 +766,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	DirectX::ScratchImage mipImages3 = LoadTexture("resources/circle.png");
 	const DirectX::TexMetadata& metadata3 = mipImages3.GetMetadata();
-	ResourceObject textureResource3 = CreateTextureResource(device, metadata2);
+	ResourceObject textureResource3 = CreateTextureResource(device, metadata3);
 	UploadTextureDate(textureResource3, mipImages3);
 	
 
@@ -790,8 +796,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
 
-	//D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
-	//D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
 
 	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -800,7 +806,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
-	//device->CreateShaderResourceView(textureResource3.Get(), &srvDesc3, textureSrvHandleCPU3);
+	device->CreateShaderResourceView(textureResource3.Get(), &srvDesc3, textureSrvHandleCPU3);
 
 	//SwapChainからResource
 	ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr };
@@ -1144,10 +1150,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Particle particles[kNumMaxInstance];
 	for (uint32_t index = 0; index < kNumMaxInstance; ++index)
 	{
-		//particles[index].transform.scale = { 1.0f,1.0f,1.0f };
-		//particles[index].transform.rotate = { 0.0f,3.14f,0.0f };
-		//particles[index].transform.translate = { index * 0.1f, index * 0.1f,index * 0.1f };
-		//particles[index].velocity = { 0.0f,1.0f,0.0f };
 
 		particles[index] = MakeNewParticle(randomEngine);
 		instancingData[index].color = particles[index].color;
@@ -1189,6 +1191,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 		ImGui::DragFloat2("UvScale" ,&uvTransformSprite.scale.x, 0.0f, -10.0f, 10.0f);
 		ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+		ImGui::DragFloat3("cameraT", &cameraTransform.translate.x);
+		ImGui::DragFloat3("cameraR", &cameraTransform.rotate.x);
 		//ImGui::DragFloat3("transforms0", &transforms[0].rotate.x, 0.01f);
 		//ImGui::DragFloat3("transforms1", &transforms[1].translate.x, 0.01f);
 		//ImGui::DragFloat3("transforms2", &transforms[2].translate.x, 0.01f);
@@ -1275,25 +1279,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			//transform.rotate.y += 0.01f;
 			//transform.rotate.y = 3.14f;
-			Matrix4x4 worldMatrix = math->MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+			
+
 			Matrix4x4 cameraMatrix = math->MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = math->Inverse(cameraMatrix);
+			Matrix4x4 billboardMatrix = math->Multiply(backToFrontMatrix, cameraMatrix);
+			billboardMatrix.m[3][0] = 1.0f; 
+			billboardMatrix.m[3][1] = 1.0f; 
+			billboardMatrix.m[3][2] = 1.0f; 
+
+			Matrix4x4 scaleMatrix = math->MakeScaleMatrix(transform.scale);
+			Matrix4x4 translateMatrix = math->MakeTranslateMatrix(transform.translate);
+			Matrix4x4 worldMatrix = math->Multiply(scaleMatrix, math->Multiply(billboardMatrix, translateMatrix));
+
 			Matrix4x4 projectionMatrix = math->MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, math->Multiply(viewMatrix, projectionMatrix));
+
+			//Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, math->Multiply(viewMatrix, projectionMatrix));
 			transformationMatrix->WVP = worldViewProjectionMatrix;
 			transformationMatrix->World = worldViewProjectionMatrix;
 
-			//Matrix4x4 uvTransformMatrix = math->MakeScaleMatrix(uvTransformSprite.scale);
-			//uvTransformMatrix = math->Multiply(uvTransformMatrix, math->MakeRotateZMatrix(uvTransformSprite.rotate.z));
-			//uvTransformMatrix = math->Multiply(uvTransformMatrix, math->MakeTranslateMatrix(uvTransformSprite.translate));
-			//materialDataSprite->uvTransform = uvTransformMatrix;
-			
-			//Matrix4x4 worldMatrixSprite = math->MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
-			//Matrix4x4 viewMatrixSprite = math->MakeIdentity4x4();
-			//Matrix4x4 projectionMatrixSprite = math->MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
-			//Matrix4x4 worldViewProjectionMatrixSprite = math->Multiply(worldMatrixSprite, math->Multiply(viewMatrixSprite, projectionMatrixSprite));
-			//transformationMatrixDataSprite->WVP = worldViewProjectionMatrixSprite;
-			//transformationMatrixDataSprite->World = worldViewProjectionMatrixSprite;
 			
 			Matrix4x4 viewProjectionMatrix = math->Multiply(viewMatrix, projectionMatrix);
 
@@ -1370,7 +1375,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
 
 			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
