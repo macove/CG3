@@ -28,6 +28,7 @@
 #include "ResourceObject.h"
 #include "random"
 #include <numbers>
+#include <list>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -118,6 +119,24 @@ struct  ParticleForGPU
 	Matrix4x4 World;
 	Vector4 color;
 };
+struct Emitter
+{
+	Transform transform;
+	uint32_t count;
+	float frequency;
+	float frequencyTime;
+	
+};
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+struct AccelerationField {
+	Vector3 acceleration;
+	AABB area;
+
+};
+
 struct D3DResourceLeakChecker {
 	~D3DResourceLeakChecker() {
 
@@ -155,7 +174,6 @@ float length(Vector3 distance) {
 Vector3 normalize(Vector3 distance) {
 	return { distance.x / length(distance),distance.y / length(distance),distance.z / length(distance) };
 }
-
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
 }
@@ -173,7 +191,6 @@ std::wstring ConvertString(const std::string& str) {
 	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
 	return result;
 }
-
 // wstring->string
 std::string ConvertString(const std::wstring& str) {
 	if (str.empty()) {
@@ -188,8 +205,6 @@ std::string ConvertString(const std::wstring& str) {
 	WideCharToMultiByte(CP_UTF8, 0, str.data(), static_cast<int>(str.size()), result.data(), sizeNeeded, NULL, NULL);
 	return result;
 }
-
-
 //CompileShader関数
 IDxcBlob* CompileShader(
 
@@ -511,24 +526,39 @@ Vector3& operator+=(Vector3& lhs, const Vector3& rhs) {
 	return lhs;
 }
 
-Particle MakeNewParticle(std::mt19937& randomEngine) {
+Particle MakeNewParticle(std::mt19937& randomEngine, const Vector3& translate) {
 	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	Particle particle;
-	particle.transform.scale = { 1.0f,1.0f,1.0f };
-	particle.transform.rotate = { 0.0f,3.14f,0.0f };
-	particle.transform.translate = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
-	particle.velocity = { distribution(randomEngine),distribution(randomEngine),distribution(randomEngine) };
+	particle.transform.scale = { 1.0f, 1.0f, 1.0f };
+	particle.transform.rotate = { 0.0f, 3.14f, 0.0f };
+
+
+	Vector3 randomTranslate{ distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
+	particle.transform.translate = math->Add(translate, randomTranslate);
+
+	particle.velocity = { distribution(randomEngine), distribution(randomEngine), distribution(randomEngine) };
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
-	particle.color = { distColor(randomEngine),distColor(randomEngine),distColor(randomEngine),1.0f };
+	particle.color = { distColor(randomEngine), distColor(randomEngine), distColor(randomEngine), 1.0f };
 	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
 	particle.lifeTime = distTime(randomEngine);
 	particle.currentTime = 0.0f;
 	return particle;
+}
 
+std::list<Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine) {
+	std::list<Particle> particles;
+	for (uint32_t count = 0; count < emitter.count; ++count) {
+		particles.push_back(MakeNewParticle(randomEngine, emitter.transform.translate));
+	}
+	return particles;
 }
 
 
-
+bool IsCollision(const AABB& aabb, const Vector3& point) {
+	return (point.x >= aabb.min.x && point.x <= aabb.max.x &&
+		point.y >= aabb.min.y && point.y <= aabb.max.y &&
+		point.z >= aabb.min.z && point.z <= aabb.max.z);
+}
 
 
 //window procedure
@@ -592,7 +622,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		//利用するクラス名
 		wc.lpszClassName,
 		//タイトルバーの文字列
-		L"CG2",
+		L"LE2B_19_パク_イジュン",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -1122,7 +1152,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
 	
 
-	const uint32_t kNumMaxInstance = 10;
+	const uint32_t kNumMaxInstance = 100;
 
 	ResourceObject instancingResource = CreateBufferResource(device.Get(), sizeof(ParticleForGPU) * kNumMaxInstance);
 	ParticleForGPU* instancingData = nullptr;
@@ -1147,16 +1177,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 	
 
-	int currentBlendMode = 1;
+	int currentBlendMode = 2;
+
+	Emitter emitter{};
+	emitter.count = 3;
+	emitter.frequency = 0.5f; 
+	emitter.frequencyTime = 0.0f; 
 
 
-	Particle particles[kNumMaxInstance];
-	for (uint32_t index = 0; index < kNumMaxInstance; ++index)
-	{
-
-		particles[index] = MakeNewParticle(randomEngine);
-		instancingData[index].color = particles[index].color;
-	}
+	std::list<Particle> particles;
+	//for (uint32_t index = 0; index < kNumMaxInstance; ++index)
+	//{
+	//	particles.push_back(MakeNewParticle(randomEngine));
+	//}
 	const float kDeltaTime = 1.0f / 60.0f;
 
 	uint32_t numInstance = 0;
@@ -1189,7 +1222,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::SliderFloat3("direction", &directionalLightData->direction.x, 0.1f,1.0f);
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
 		ImGui::SliderFloat2("transform.rotate ", &transform.rotate.x, 0.0f, 6.28f);
-		ImGui::DragFloat3("particles[0]", &particles[0].transform.translate.x, 1.0f);
+		//ImGui::DragFloat3("particles[0]", &particles[0].transform.translate.x, 1.0f);
 		//ImGui::DragFloat3("transformSpriteR", &transformSprite.rotate.x, 0.01f);
 		ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 		ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
@@ -1307,37 +1340,38 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			
 			Matrix4x4 viewProjectionMatrix = math->Multiply(viewMatrix, projectionMatrix);
 
-			//for (uint32_t index = 0; index < kNumMaxInstance; index++)
-			//{
-			//	
-			//	instancingData[index].WVP = worldViewProjectionMatrix;
-			//	instancingData[index].World = worldMatrix;
-			//	
-			//}
 
 			numInstance = 0;
 
-			for (uint32_t index = 0; index < kNumMaxInstance; ++index) {
+			emitter.frequencyTime += kDeltaTime; 
+			if (emitter.frequencyTime >= emitter.frequency) {
 				
-				if (particles[index].currentTime >= particles[index].lifeTime) {
+				particles.splice(particles.end(), Emit(emitter, randomEngine));
+				emitter.frequencyTime -= emitter.frequency; 
+			}
+
+			for (auto particleIterator = particles.begin(); particleIterator != particles.end(); ) {
+				
+				
+				particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
+				particleIterator->currentTime += kDeltaTime;
+
+				if (numInstance < kNumMaxInstance){
+					Matrix4x4 worldMatrix =
+						math->MakeAffineMatrix(particleIterator->transform.scale, particleIterator->transform.rotate, particleIterator->transform.translate);
+					Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, viewProjectionMatrix);
+					instancingData[numInstance].WVP = worldViewProjectionMatrix;
+					instancingData[numInstance].World = worldMatrix;
+					instancingData[numInstance].color = particleIterator->color;
+					float alpha = 1.0f - (particleIterator->currentTime / particleIterator->lifeTime);
+					instancingData[numInstance].color.w = alpha;
+					++numInstance;
+				}
+				if (particleIterator->currentTime >= particleIterator->lifeTime) {
+					particleIterator = particles.erase(particleIterator);
 					continue;
 				}
-				particles[index].transform.translate += particles[index].velocity * kDeltaTime;
-				particles[index].currentTime += kDeltaTime;
-
-
-				//if (numInstance >= kNumMaxInstance) {
-				//	break;
-				//}
-				Matrix4x4 worldMatrix =
-					math->MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
-				Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, viewProjectionMatrix);
-				instancingData[numInstance].WVP = worldViewProjectionMatrix;
-				instancingData[numInstance].World = worldMatrix;
-				instancingData[numInstance].color = particles[index].color;
-				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
-				instancingData[numInstance].color.w = alpha;
-				++numInstance;
+				++particleIterator;
 			}
 			
 			
