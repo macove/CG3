@@ -1184,6 +1184,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	emitter.frequency = 0.5f; 
 	emitter.frequencyTime = 0.0f; 
 
+	AccelerationField accelerationField;
+	accelerationField.acceleration = { 0.0f,-15.0f,0.0f };
+	accelerationField.area.min = { -1.0f,-1.0f,-1.0f };
+	accelerationField.area.max = { 1.0f,1.0f,1.0f };
 
 	std::list<Particle> particles;
 	//for (uint32_t index = 0; index < kNumMaxInstance; ++index)
@@ -1352,7 +1356,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			for (auto particleIterator = particles.begin(); particleIterator != particles.end(); ) {
 				
-				
+				if (IsCollision(accelerationField.area, particleIterator->transform.translate)) {
+					particleIterator->velocity += accelerationField.acceleration * kDeltaTime;
+				}
+
 				particleIterator->transform.translate += particleIterator->velocity * kDeltaTime;
 				particleIterator->currentTime += kDeltaTime;
 
