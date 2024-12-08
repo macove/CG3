@@ -13,9 +13,11 @@
 #include"Matrix3x3.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+#ifdef _DEBUG
 #include "externals/imgui/imgui.h"
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
+#endif
 #include "externals/DirectXTex/DirectXTex.h"
 #include<wrl.h>
 #define _CRTDBG_MAP_ALLOC
@@ -33,9 +35,9 @@
 #pragma comment(lib,"dxcompiler.lib")
 
 using Microsoft::WRL::ComPtr;
-
+#ifdef _DEBUG
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
+#endif
 
 
 enum blendModes {
@@ -134,7 +136,7 @@ Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 Transform cameraTransform{ 
 	{1.0f,1.0f,1.0f},
-	{(std::numbers::pi_v<float>/3.0f),std::numbers::pi_v<float>,0.0f} ,
+	{0.0f,0.0f,0.0f} ,
 	{0.0f,0.0f,-10.0f} };
 
 Matrix4x4 backToFrontMatrix = math->MakeRotateYMatrix(std::numbers::pi_v<float>); 
@@ -532,10 +534,11 @@ Particle MakeNewParticle(std::mt19937& randomEngine) {
 //window procedure
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
 	WPARAM wparam, LPARAM lparam) {
+#ifdef _DEBUG
 	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam)) {
 		return true;
 	}
-
+#endif
 	//メッセージに応じてゲーム固有の処理を行う
 	switch (msg) {
 		//ウィンドウが破棄された
@@ -973,7 +976,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
@@ -1161,6 +1164,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	
 
 	//ImGui初期化
+#ifdef _DEBUG
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
@@ -1171,12 +1175,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		srvDescriptorHeap.Get(),
 		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
 		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
+#endif
 
 	MSG msg{};
 
 	while (msg.message != WM_QUIT) {
-
+#ifdef _DEBUG
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
@@ -1257,6 +1261,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		ImGui::End();
 		ImGui::Render();
+#endif
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -1382,9 +1387,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//commandList->DrawInstanced(6, 1, 0, 0);
 			//commandList->DrawIndexedInstanced(UINT(modelData.vertices.size()), instanceCount, 0, 0, 0);
 
-
+#ifdef _DEBUG
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList.Get());
-
+#endif
 			//Swap Chain Buffer Transition to Present
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
@@ -1429,11 +1434,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 		}
 	}
-
+#ifdef _DEBUG
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
-
+#endif
 	CloseHandle(fenceEvent);
 
 	delete math;
