@@ -19,6 +19,8 @@ struct ParticleForGPU
 
 StructuredBuffer<ParticleForGPU> gPaticle : register(t0);
 
+
+
 struct VertexShaderInput
 {
     float4 position : POSITION0;

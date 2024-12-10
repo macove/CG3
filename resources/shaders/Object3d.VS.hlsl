@@ -17,11 +17,14 @@ struct VertexShaderInput
 
 
 
+
+
 VertexShaderOutput main(VertexShaderInput input)
 {
     VertexShaderOutput output;
     output.position = mul(input.position, gTransformtiomMatrix.WVP);
     output.texcoord = input.texcoord;
     output.normal = normalize(mul(input.normal, (float3x3) gTransformtiomMatrix.World));
+    output.worldPosition = mul(input.position, gTransformtiomMatrix.World).xyz;
     return output;
 }

@@ -136,7 +136,11 @@ struct AccelerationField {
 	AABB area;
 
 };
+struct CameraForGPU {
 
+	Vector3 worldPosition;
+
+};
 struct D3DResourceLeakChecker {
 	~D3DResourceLeakChecker() {
 
@@ -1185,20 +1189,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	emitter.frequencyTime = 0.0f; 
 
 	AccelerationField accelerationField;
-	accelerationField.acceleration = { 0.0f,-15.0f,0.0f };
+	accelerationField.acceleration = { 0.0f,3.0f,0.0f };
 	accelerationField.area.min = { -1.0f,-1.0f,-1.0f };
 	accelerationField.area.max = { 1.0f,1.0f,1.0f };
 
 	std::list<Particle> particles;
-	//for (uint32_t index = 0; index < kNumMaxInstance; ++index)
-	//{
-	//	particles.push_back(MakeNewParticle(randomEngine));
-	//}
+	
 	const float kDeltaTime = 1.0f / 60.0f;
 
 	uint32_t numInstance = 0;
 	
-	
+	int directionTime = 0;
 
 	//ImGui初期化
 #ifdef _DEBUG
@@ -1297,6 +1298,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			assert(SUCCEEDED(hr));
 		}
 		ImGui::End();
+		ImGui::Begin("particle");
+		ImGui::DragFloat2("particlrT", &emitter.transform.translate.x,0.01f);
+		ImGui::End();
 		ImGui::Render();
 #endif
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -1346,6 +1350,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 			numInstance = 0;
+
+			//directionTime++;
+
+			
 
 			emitter.frequencyTime += kDeltaTime; 
 			if (emitter.frequencyTime >= emitter.frequency) {
