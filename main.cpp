@@ -76,6 +76,7 @@ struct  Material
 	int32_t enableLighting;
 	float padding[3];
 	Matrix4x4 uvTransform;
+	float shininess;
 };
 
 struct TransformationMatrix
@@ -99,6 +100,11 @@ struct ModelData
 	std::vector<VertexData> vertices;
 	MaterialData material;
 };
+struct CameraForGPU
+{
+	Vector3 worldPosition;
+};
+
 
 struct D3DResourceLeakChecker {
 	~D3DResourceLeakChecker() {
@@ -786,20 +792,28 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	//複数設定できるので配列。今回は結果１つだけなので長さ1の配列
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; //VertexShaderで使う
 	rootParameters[1].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
+
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; //DescriptorTableを使う
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange; //Tableの中身の配列の指定
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange); //Tableで利用する数
+
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[3].Descriptor.ShaderRegister = 1; //レジスタ番号1
+
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // Pixel Shader
+	rootParameters[4].Descriptor.ShaderRegister = 2; //レジスタ番号2
+
 	descriptionRootSignature.pParameters = rootParameters; //rootParameters配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); //配列の長さ
 
@@ -846,6 +860,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	inputElementDescs[2].SemanticIndex = 0;
 	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	//inputElementDescs[3].SemanticName = "POSITION";
+	//inputElementDescs[3].SemanticIndex = 0;
+	//inputElementDescs[3].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+	//inputElementDescs[3].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
@@ -1049,6 +1067,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	directionalLightData->color = { 1.0f,1.0f,1.0f,1.0f };
 	directionalLightData->direction = { 0.0f,-1.0f,0.0f };
 	directionalLightData->intensity = 1.0f;
+
+	//camera
+	ResourceObject cameraResource = CreateBufferResource(device.Get(), sizeof(CameraForGPU));
+	CameraForGPU* cameraData = nullptr;
+	cameraResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
+	cameraData->worldPosition = cameraTransform.translate;
+
 	//Viewport
 	D3D12_VIEWPORT viewport{};
 
@@ -1075,6 +1100,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
 	materialDate->color = { 1.0f,1.0f,1.0f,1.0f };
 	materialDate->enableLighting = true;
+	materialDate->shininess = 50.0f;
 
 	//TransformationMatrix Resource
 	ResourceObject wvpResoure = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
@@ -1177,9 +1203,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::DragFloat3("transformSprite", &transformSprite.translate.x, 1.0f);
 		ImGui::DragFloat3("transformSpriteR", &transformSprite.rotate.x, 0.01f);
 		ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-		ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-		ImGui::DragFloat2("UvScale" ,&uvTransformSprite.scale.x, 0.0f, -10.0f, 10.0f);
-		ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+		//ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
+		//ImGui::DragFloat2("UvScale" ,&uvTransformSprite.scale.x, 0.0f, -10.0f, 10.0f);
+		//ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 		ImGui::End();
 		ImGui::Begin("Blend");
 		const char* blendModeNames[] = {
@@ -1313,6 +1339,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
 			commandList->DrawInstanced(startIndex, 1, 0, 0);
 
 			//Vertex Buffer Binding
