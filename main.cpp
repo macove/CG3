@@ -850,12 +850,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
 
-	//BlendState
-	//D3D12_BLEND_DESC blendDesc{};
-	//blendDesc.RenderTarget[0].RenderTargetWriteMask =
-	//	D3D12_COLOR_WRITE_ENABLE_ALL;
-
-
 	//Blend
 	D3D12_BLEND_DESC blendDesc{};
 
@@ -934,14 +928,115 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     //model
     ModelData modelData = LoadObjFile("resources", "axis.obj");
 	ResourceObject vertexResoure = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData.vertices.size());
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	vertexBufferView.BufferLocation = vertexResoure.Get()->GetGPUVirtualAddress();
-	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView3D{};
+	vertexBufferView3D.BufferLocation = vertexResoure.Get()->GetGPUVirtualAddress();
+	vertexBufferView3D.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+	vertexBufferView3D.StrideInBytes = sizeof(VertexData);
 
 	VertexData* vertexData = nullptr;
 	vertexResoure.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData)* modelData.vertices.size());
+
+
+	uint32_t lonIndex = 0;
+	uint32_t latIndex = 16;
+	const uint32_t kSubdivision = 16;
+
+	uint32_t startIndex = (latIndex * kSubdivision + lonIndex) * 6;
+
+	ResourceObject vertexResource = CreateBufferResource(device.Get(), sizeof(VertexData) * startIndex);
+
+	//VertexBufferView 
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+	vertexBufferView.BufferLocation = vertexResource.Get()->GetGPUVirtualAddress();
+
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * startIndex;
+
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	VertexData* vertexDate = nullptr;
+
+	const float kLonEvery = float(M_PI * 2.0f) / kSubdivision;
+	const float kLatEvery = float(M_PI / kSubdivision);
+
+	vertexResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&vertexDate));
+
+	for (latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+
+		float lat = float(-M_PI / 2.0f) + (kLatEvery * latIndex);
+		float v = 1.0f - float(latIndex) / float(kSubdivision);
+		float v2 = 1.0f - float(latIndex + 1) / float(kSubdivision);
+
+		for (lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+
+			float lon = float(lonIndex * kLonEvery);
+
+			float u = float(lonIndex) / float(kSubdivision);
+			float u2 = float(lonIndex + 1) / float(kSubdivision);
+
+			vertexDate[start].position.x = cos(lat) * cos(lon);
+			vertexDate[start].position.y = sin(lat);
+			vertexDate[start].position.z = cos(lat) * sin(lon);
+			vertexDate[start].position.w = 1.0f;
+			vertexDate[start].texCoord = { u,v };
+			vertexDate[start].normal.x = vertexDate[start].position.x;
+			vertexDate[start].normal.y = vertexDate[start].position.y;
+			vertexDate[start].normal.z = vertexDate[start].position.z;
+
+			vertexDate[start + 1].position.x = (cos(lat + kLatEvery) * cos(lon));
+			vertexDate[start + 1].position.y = sin(lat + kLatEvery);
+			vertexDate[start + 1].position.z = (cos(lat + kLatEvery) * sin(lon));
+			vertexDate[start + 1].position.w = 1.0f;
+			vertexDate[start + 1].texCoord = { u,v2 };
+			vertexDate[start + 1].normal.x = vertexDate[start + 1].position.x;
+			vertexDate[start + 1].normal.y = vertexDate[start + 1].position.y;
+			vertexDate[start + 1].normal.z = vertexDate[start + 1].position.z;
+
+			vertexDate[start + 2].position.x = (cos(lat) * cos(lon + kLonEvery));
+			vertexDate[start + 2].position.y = sin(lat);
+			vertexDate[start + 2].position.z = (cos(lat) * sin(lon + kLonEvery));
+			vertexDate[start + 2].position.w = 1.0f;
+			vertexDate[start + 2].texCoord = { u2,v };
+			vertexDate[start + 2].normal.x = vertexDate[start + 2].position.x;
+			vertexDate[start + 2].normal.y = vertexDate[start + 2].position.y;
+			vertexDate[start + 2].normal.z = vertexDate[start + 2].position.z;
+
+			///////////////////////////////////////////////////////////
+
+			vertexDate[start + 3].position.x = (cos(lat + kLatEvery) * cos(lon));
+			vertexDate[start + 3].position.y = sin(lat + kLatEvery);
+			vertexDate[start + 3].position.z = (cos(lat + kLatEvery) * sin(lon));
+			vertexDate[start + 3].position.w = 1.0f;
+			vertexDate[start + 3].texCoord = { u,v2 };
+			vertexDate[start + 3].normal.x = vertexDate[start + 3].position.x;
+			vertexDate[start + 3].normal.y = vertexDate[start + 3].position.y;
+			vertexDate[start + 3].normal.z = vertexDate[start + 3].position.z;
+
+			vertexDate[start + 4].position.x = (cos(lat + kLatEvery) * cos(lon + kLonEvery));
+			vertexDate[start + 4].position.y = sin(lat + kLatEvery);
+			vertexDate[start + 4].position.z = (cos(lat + kLatEvery) * sin(lon + kLonEvery));
+			vertexDate[start + 4].position.w = 1.0f;
+			vertexDate[start + 4].texCoord = { u2,v2 };
+			vertexDate[start + 4].normal.x = vertexDate[start + 4].position.x;
+			vertexDate[start + 4].normal.y = vertexDate[start + 4].position.y;
+			vertexDate[start + 4].normal.z = vertexDate[start + 4].position.z;
+
+			vertexDate[start + 5].position.x = (cos(lat) * cos(lon + kLonEvery));
+			vertexDate[start + 5].position.y = sin(lat);
+			vertexDate[start + 5].position.z = (cos(lat) * sin(lon + kLonEvery));
+			vertexDate[start + 5].position.w = 1.0f;
+			vertexDate[start + 5].texCoord = { u2,v };
+			vertexDate[start + 5].normal.x = vertexDate[start + 5].position.x;
+			vertexDate[start + 5].normal.y = vertexDate[start + 5].position.y;
+			vertexDate[start + 5].normal.z = vertexDate[start + 5].position.z;
+
+
+		}
+
+	}
+
 
 	//Lighting
 
@@ -954,8 +1049,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	directionalLightData->color = { 1.0f,1.0f,1.0f,1.0f };
 	directionalLightData->direction = { 0.0f,-1.0f,0.0f };
 	directionalLightData->intensity = 1.0f;
-
-
 	//Viewport
 	D3D12_VIEWPORT viewport{};
 
@@ -974,7 +1067,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	scissorRect.top = 0;
 	scissorRect.bottom = kClientHeight;
 
-	bool useMonsterBall = false;
+	bool useMonsterBall = true;
 
 	//Material Resource
 	ResourceObject materialResource = CreateBufferResource(device.Get(), sizeof(Material));
@@ -1166,7 +1259,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
-			//transform.rotate.y += 0.01f;
+			transform.rotate.y += 0.01f;
 			//transform.rotate.y = 3.14f;
 			Matrix4x4 worldMatrix = math->MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			Matrix4x4 cameraMatrix = math->MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
@@ -1213,14 +1306,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootSignature(rootSignature.Get());
 			commandList->SetPipelineState(graphicsPipelineState.Get());
 
-			//Vertex Buffer Binding
+			//mon
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			commandList->DrawInstanced(startIndex, 1, 0, 0);
+
+			//Vertex Buffer Binding
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferView3D);
+			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
+			//commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
 
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
