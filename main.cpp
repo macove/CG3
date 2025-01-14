@@ -858,13 +858,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	//Blend
 	D3D12_BLEND_DESC blendDesc{};
-	
 
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-
-	blendMode blend = kBlendModeNormal;
-
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
@@ -1057,7 +1053,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Transform transformSprite{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 
 	
-
+	int currentBlendMode = 1;
 
 
 	//ImGui初期化
@@ -1093,20 +1089,60 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 		ImGui::End();
 		ImGui::Begin("Blend");
-		static int currentBlendMode = kBlendModeNone;
 		const char* blendModeNames[] = {
-			"None",
-			"Normal",
-			"Add",
-			"Subtract",
-			"Multiply",
-			"Screen",
-			"CountOfBlendModeNone"
+			  "None",
+			  "Normal",
+			  "Add",
+			  "Subtract",
+			  "Multiply",
+			  "Screen"
 		};
-		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
+
+		ImGui::ColorEdit4("Material", &materialDate->color.x);
 		if (ImGui::Combo("Blend Mode", &currentBlendMode, blendModeNames, IM_ARRAYSIZE(blendModeNames))) {
-			
-			printf("Selected Blend Mode: %s\n", blendModeNames[currentBlendMode]);
+
+			switch (currentBlendMode)
+			{
+			case 0:
+				blendDesc.RenderTarget[0].BlendEnable = FALSE;
+				break;
+			case 1:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+				break;
+			case 2:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+				break;
+			case 3:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+				break;
+			case 4:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
+				break;
+			case 5:
+				blendDesc.RenderTarget[0].BlendEnable = TRUE;
+				blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+				blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_COLOR;
+				blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+				break;
+			default:
+				break;
+			}
+			graphicsPipelineStateDesc.BlendState = blendDesc;
+
+			HRESULT hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState));
+			assert(SUCCEEDED(hr));
 		}
 		ImGui::End();
 		ImGui::Render();
