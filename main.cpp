@@ -7,7 +7,7 @@
 #include<cassert>
 #include<dxgidebug.h>
 #include <dxcapi.h>
-#include"Math.h"
+#include"MyMath.h"
 #include "Vector2.h"
 #include <cmath>
 #include"Matrix3x3.h"
@@ -46,7 +46,7 @@ enum blendMode {
 
 };
 
-Math* math = new Math();
+MyMath* math = new MyMath();
 
 struct Vector4 final {
 	float x;
@@ -84,6 +84,7 @@ struct TransformationMatrix
 {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
+	Matrix4x4 WorldInverseTranspose;
 };
 
 struct DirectionalLight
@@ -1109,8 +1110,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ResourceObject wvpResoure = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
 	TransformationMatrix* transformationMatrix = nullptr;
 	wvpResoure.Get()->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrix));
-	transformationMatrix->WVP = math->MakeIdentity4x4();
-	transformationMatrix->World = math->MakeIdentity4x4();
+	//transformationMatrix->WVP = math->MakeIdentity4x4();
+	//transformationMatrix->World = math->MakeIdentity4x4();
+	//transformationMatrix->WorldInverseTranspose = math->MakeIdentity4x4();
+	transformationMatrix->World = math->MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	transformationMatrix->WVP = math->Multiply(transformationMatrix->World, math->MakePerspectiveFovMatrix(60.0f, 1280.0f / 720.0f, 0.1f, 100.0f));
+	transformationMatrix->WorldInverseTranspose = math->MakeInverseTransposeMatrix(transformationMatrix->World);
 
 	//Sprite
 	ResourceObject vertexResourceSprite = CreateBufferResource(device.Get(), sizeof(VertexData) * 6);
@@ -1202,7 +1207,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::ColorEdit4("Material", &directionalLightData->color.x);
 		ImGui::SliderFloat3("direction", &directionalLightData->direction.x, 0.1f,1.0f);
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
-		ImGui::SliderFloat2("transform.rotate ", &transform.rotate.x, 0.0f, 6.28f);
+		ImGui::SliderFloat3("Scale ", &transform.scale.x, 0.0f, 6.28f);
+		ImGui::SliderFloat2("Rotate ", &transform.rotate.x, 0.0f, 6.28f);
 		ImGui::DragFloat3("transformSprite", &transformSprite.translate.x, 1.0f);
 		ImGui::DragFloat3("transformSpriteR", &transformSprite.rotate.x, 0.01f);
 		ImGui::Checkbox("useMonsterBall", &useMonsterBall);
