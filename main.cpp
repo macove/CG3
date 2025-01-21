@@ -77,6 +77,7 @@ struct  Material
 	float padding[3];
 	Matrix4x4 uvTransform;
 	float shininess;
+	int reflectModel;
 };
 
 struct TransformationMatrix
@@ -1100,7 +1101,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&materialDate));
 	materialDate->color = { 1.0f,1.0f,1.0f,1.0f };
 	materialDate->enableLighting = true;
-	materialDate->shininess = 50.0f;
+	materialDate->shininess = 30.0f;
+	int reflectModel = 1;
+
 
 	//TransformationMatrix Resource
 	ResourceObject wvpResoure = CreateBufferResource(device.Get(), sizeof(TransformationMatrix));
@@ -1264,11 +1267,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			assert(SUCCEEDED(hr));
 		}
 		ImGui::End();
+		ImGui::Begin("Reflection Model");
+		if (ImGui::RadioButton("Phong", reflectModel == 0)) {
+			reflectModel = 0;
+		}
+		if (ImGui::RadioButton("Blinn-Phong", reflectModel == 1)) {
+			reflectModel = 1;
+		}
+		ImGui::End();
 		ImGui::Render();
 		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+
+			materialDate->reflectModel = reflectModel;
 
 			directionalLightData->direction = normalize(directionalLightData->direction);
 
@@ -1285,8 +1298,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
-			transform.rotate.y += 0.01f;
-			//transform.rotate.y = 3.14f;
+			//transform.rotate.y += 0.01f;
+			transform.rotate.y = -1.67f;
 			Matrix4x4 worldMatrix = math->MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			Matrix4x4 cameraMatrix = math->MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = math->Inverse(cameraMatrix);
