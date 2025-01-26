@@ -22,11 +22,19 @@ struct Camera
 {
     float3 worldPosition;
 };
-
+struct PointLight
+{
+    float4 color;
+    float3 position;
+    float intensity;
+    float innerAngle;
+    float outerAngle;
+};
 
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b1);
 ConstantBuffer<Camera> gCamera : register(b2);
+ConstantBuffer<PointLight> gPointLight : register(b3);
 Texture2D<float4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 struct PixelShaderOutput
@@ -56,6 +64,20 @@ PixelShaderOutput main(VertexShaderOutput input)
             float NdotH = dot(normalize(input.normal), halfVector);
             float specularPow = pow(saturate(NdotH), gMaterial.shininess);
             specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float3(1.0f, 1.0f, 1.0f);
+            
+            float NdotL = dot(normalize(input.normal), lightDirection);
+            float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+            float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+
+            output.color.rgb = diffuse + specular;
+        }
+        if (gMaterial.reflectModel == 2)
+        {
+            float3 pointLightDirection = normalize(input.worldPosition - gPointLight.position);
+
+            //gPointLight.color.rgb * gPointLight.intensity;
+            output.color.rgb = diffuse
+
         }
         else
         { // Phong
@@ -64,14 +86,16 @@ PixelShaderOutput main(VertexShaderOutput input)
             float RdotE = dot(reflectLight, toEye);
             float specularPow = pow(saturate(RdotE), gMaterial.shininess);
             specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float3(1.0f, 1.0f, 1.0f);
+            
+            float NdotL = dot(normalize(input.normal), lightDirection);
+            float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
+            float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+
+            output.color.rgb = diffuse + specular;
         }
         
         
-        float NdotL = dot(normalize(input.normal), lightDirection);
-        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-        float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-
-        output.color.rgb = diffuse + specular;
+       
         output.color.a = gMaterial.color.a * textureColor.a;
         
     }

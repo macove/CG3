@@ -106,7 +106,11 @@ struct CameraForGPU
 {
 	Vector3 worldPosition;
 };
-
+struct PointLight {
+	Vector4 color;
+	Vector3 position;
+	float intensity;
+};
 
 struct D3DResourceLeakChecker {
 	~D3DResourceLeakChecker() {
@@ -121,7 +125,7 @@ struct D3DResourceLeakChecker {
 };
 
 Transform transform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
-Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f} ,{0.0f,0.0f,-10.0f} };
+Transform cameraTransform{ {1.0f,1.0f,1.0f},{0.6f,0.0f,0.0f} ,{0.0f,11.0f,-18.0f} };
 
 Transform uvTransformSprite
 {
@@ -713,6 +717,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ResourceObject textureResource2 = CreateTextureResource(device, metadata2);
 	UploadTextureDate(textureResource2, mipImages2);
 
+	DirectX::ScratchImage mipImages3 = LoadTexture("resources/grass.png");
+	const DirectX::TexMetadata& metadata3 = mipImages3.GetMetadata();
+	ResourceObject textureResource3 = CreateTextureResource(device, metadata3);
+	UploadTextureDate(textureResource3, mipImages3);
 
 	//metadataを基にSRVの設定
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -726,6 +734,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	srvDesc2.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc2.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc2.Texture2D.MipLevels = UINT(metadata2.mipLevels);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc3{};
+	srvDesc3.Format = metadata3.format;
+	srvDesc3.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc3.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc3.Texture2D.MipLevels = UINT(metadata3.mipLevels);
 	
 
 	//SRVを作成するDescriptorHeapの場所を決める
@@ -735,12 +749,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
 	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
 
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+
 	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	device->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU);
 
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+
+	device->CreateShaderResourceView(textureResource3.Get(), &srvDesc3, textureSrvHandleCPU3);
 
 	//SwapChainからResource
 	ComPtr<ID3D12Resource> swapChainResources[2] = { nullptr };
@@ -946,7 +965,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	
     //model
-    ModelData modelData = LoadObjFile("resources", "axis.obj");
+    ModelData modelData = LoadObjFile("resources", "terrain.obj");
 	ResourceObject vertexResoure = CreateBufferResource(device.Get(), sizeof(VertexData) * modelData.vertices.size());
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView3D{};
 	vertexBufferView3D.BufferLocation = vertexResoure.Get()->GetGPUVirtualAddress();
@@ -1209,12 +1228,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
 		ImGui::SliderFloat3("Scale ", &transform.scale.x, 0.0f, 6.28f);
 		ImGui::SliderFloat2("Rotate ", &transform.rotate.x, 0.0f, 6.28f);
+		ImGui::SliderFloat3("cameraTransform", &cameraTransform.translate.x, -20.0f, 20.0f);
+		ImGui::SliderFloat3("cameraRotate", &cameraTransform.rotate.x, -20.0f, 20.0f);
 		ImGui::DragFloat3("transformSprite", &transformSprite.translate.x, 1.0f);
 		ImGui::DragFloat3("transformSpriteR", &transformSprite.rotate.x, 0.01f);
-		ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-		//ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-		//ImGui::DragFloat2("UvScale" ,&uvTransformSprite.scale.x, 0.0f, -10.0f, 10.0f);
-		//ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+		ImGui::Checkbox("useMonsterBall", &useMonsterBall);;
 		ImGui::End();
 		ImGui::Begin("Blend");
 		const char* blendModeNames[] = {
@@ -1366,9 +1384,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
-			//commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			//commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
 
 			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
