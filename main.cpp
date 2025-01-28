@@ -1341,7 +1341,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			Matrix4x4 projectionMatrix = math->MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, math->Multiply(viewMatrix, projectionMatrix));
 
-			//Matrix4x4 worldViewProjectionMatrix = math->Multiply(worldMatrix, math->Multiply(viewMatrix, projectionMatrix));
 			transformationMatrix->WVP = worldViewProjectionMatrix;
 			transformationMatrix->World = worldViewProjectionMatrix;
 
