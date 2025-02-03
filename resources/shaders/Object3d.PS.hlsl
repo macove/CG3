@@ -27,8 +27,8 @@ struct PointLight
     float4 color;
     float3 position;
     float intensity;
-    float innerAngle;
-    float outerAngle;
+    float radius;
+    float decay;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -49,60 +49,66 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
-    //float4 textureColor = gTexture.Sample(gSampler, input.texcoord);
+    float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+    float3 lightDirection, specular;
+    float3 lightColor = gDirectionalLight.color.rgb;
+    float lightIntensity = gDirectionalLight.intensity;
   
+   
+    
+    
     if (gMaterial.enableLighting != 0)
     {
-        
-        float3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
-        float3 lightDirection = -gDirectionalLight.direction;
-        float3 specular;
-        
-        if (gMaterial.reflectModel == 1)
-        { // Blinn-Phong
+    
+        if (gMaterial.reflectModel >= 2)
+        {
+        // Point Light
+            lightDirection = normalize(input.worldPosition - gPointLight.position);
+            lightColor = gPointLight.color.rgb;
+            lightIntensity = gPointLight.intensity;
+            
+            float distance = length(gPointLight.position - input.worldPosition);
+            float factor = pow(saturate(-distance / gPointLight.radius + 1.0), gPointLight.decay);
+            
+            lightIntensity = lightIntensity * factor;
+        }
+        else
+        {
+        // Directional Light
+            lightDirection = -gDirectionalLight.direction;
+        }
+
+        if (gMaterial.reflectModel % 2 == 1)
+        {
+        // Blinn-Phong
             float3 halfVector = normalize(lightDirection + toEye);
             float NdotH = dot(normalize(input.normal), halfVector);
             float specularPow = pow(saturate(NdotH), gMaterial.shininess);
-            specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float3(1.0f, 1.0f, 1.0f);
-            
-            float NdotL = dot(normalize(input.normal), lightDirection);
-            float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-            float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-
-            output.color.rgb = diffuse + specular;
-        }
-        if (gMaterial.reflectModel == 2)
-        {
-            float3 pointLightDirection = normalize(input.worldPosition - gPointLight.position);
-
-            //gPointLight.color.rgb * gPointLight.intensity;
-            output.color.rgb = diffuse
-
+            specular = lightColor * lightIntensity * specularPow * float3(1.0f, 1.0f, 1.0f);
         }
         else
-        { // Phong
-
+        {
+        // Phong
             float3 reflectLight = reflect(-lightDirection, normalize(input.normal));
             float RdotE = dot(reflectLight, toEye);
             float specularPow = pow(saturate(RdotE), gMaterial.shininess);
-            specular = gDirectionalLight.color.rgb * gDirectionalLight.intensity * specularPow * float3(1.0f, 1.0f, 1.0f);
-            
-            float NdotL = dot(normalize(input.normal), lightDirection);
-            float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
-            float3 diffuse = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
-
-            output.color.rgb = diffuse + specular;
+            specular = lightColor * lightIntensity * specularPow * float3(1.0f, 1.0f, 1.0f);
         }
-        
-        
-       
+
+        float NdotL = dot(normalize(input.normal), lightDirection);
+        float cosTheta = pow(NdotL * 0.5f + 0.5f, 2.0f);
+        float3 diffuse = gMaterial.color.rgb * textureColor.rgb * lightColor * cosTheta * lightIntensity;
+
+        output.color.rgb = diffuse + specular;
         output.color.a = gMaterial.color.a * textureColor.a;
-        
     }
     else
     {
+    
         output.color = gMaterial.color * textureColor;
     }
+   
+        
     
     return output;
     

@@ -110,6 +110,9 @@ struct PointLight {
 	Vector4 color;
 	Vector3 position;
 	float intensity;
+	float radius;
+	float decay;
+	float padding[2];
 };
 
 struct D3DResourceLeakChecker {
@@ -813,7 +816,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.Flags =
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	//複数設定できるので配列。今回は結果１つだけなので長さ1の配列
-	D3D12_ROOT_PARAMETER rootParameters[5] = {};
+	D3D12_ROOT_PARAMETER rootParameters[6] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; //CBVを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; //PixelShaderで使う
 	rootParameters[0].Descriptor.ShaderRegister = 0; //レジスタ番号0とバインド
@@ -834,6 +837,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // Pixel Shader
 	rootParameters[4].Descriptor.ShaderRegister = 2; //レジスタ番号2
+
+	rootParameters[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParameters[5].Descriptor.ShaderRegister = 3;
 
 	descriptionRootSignature.pParameters = rootParameters; //rootParameters配列へのポインタ
 	descriptionRootSignature.NumParameters = _countof(rootParameters); //配列の長さ
@@ -1089,6 +1096,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	directionalLightData->direction = { 0.0f,-1.0f,0.0f };
 	directionalLightData->intensity = 1.0f;
 
+	//point Light
+
+	ResourceObject pointLightResource = CreateBufferResource(device.Get(), sizeof(PointLight));
+
+	PointLight* pointLightData = nullptr;
+	pointLightResource.Get()->Map(0, nullptr, reinterpret_cast<void**>(&pointLightData));
+
+	pointLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f }; 
+	pointLightData->position = { 0.0f, 5.0f, 19.6f }; 
+	pointLightData->intensity = 1.0f;
+	pointLightData->radius = 1.0f;
+	pointLightData->decay = 1.0f;
+
+
+
 	//camera
 	ResourceObject cameraResource = CreateBufferResource(device.Get(), sizeof(CameraForGPU));
 	CameraForGPU* cameraData = nullptr;
@@ -1228,6 +1250,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		ImGui::SliderFloat("intensity ", &directionalLightData->intensity, 0.0f,5.0f);
 		ImGui::SliderFloat3("Scale ", &transform.scale.x, 0.0f, 6.28f);
 		ImGui::SliderFloat2("Rotate ", &transform.rotate.x, 0.0f, 6.28f);
+		ImGui::DragFloat3("PoLightPos", &pointLightData->position.x,0.1f);
+		ImGui::DragFloat("PoLightRad", &pointLightData->radius, 0.1f);
+		ImGui::DragFloat("PoLightdecay", &pointLightData->decay, 0.1f);
 		ImGui::SliderFloat3("cameraTransform", &cameraTransform.translate.x, -20.0f, 20.0f);
 		ImGui::SliderFloat3("cameraRotate", &cameraTransform.rotate.x, -20.0f, 20.0f);
 		ImGui::DragFloat3("transformSprite", &transformSprite.translate.x, 1.0f);
@@ -1292,11 +1317,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		ImGui::End();
 		ImGui::Begin("Reflection Model");
-		if (ImGui::RadioButton("Phong", reflectModel == 0)) {
+		if (ImGui::RadioButton("Directional Phong", reflectModel == 0)) {
 			reflectModel = 0;
 		}
-		if (ImGui::RadioButton("Blinn-Phong", reflectModel == 1)) {
+		if (ImGui::RadioButton("Directional Blinn-Phong", reflectModel == 1)) {
 			reflectModel = 1;
+		}
+		if (ImGui::RadioButton("Point Phong", reflectModel == 2)) {
+			reflectModel = 2;
+		}
+		if (ImGui::RadioButton("Point Blinn-Phong", reflectModel == 3)) {
+			reflectModel = 3;
 		}
 		ImGui::End();
 		ImGui::Render();
@@ -1305,9 +1336,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			DispatchMessage(&msg);
 		} else {
 
-			materialDate->reflectModel = reflectModel;
 
 			directionalLightData->direction = normalize(directionalLightData->direction);
+			materialDate->reflectModel = reflectModel;
+			
 
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -1377,6 +1409,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(5, pointLightResource.Get()->GetGPUVirtualAddress());
 			commandList->DrawInstanced(startIndex, 1, 0, 0);
 
 			//Vertex Buffer Binding
@@ -1385,8 +1418,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResoure.Get()->GetGPUVirtualAddress());
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU3);
-			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
-			//commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(4, cameraResource.Get()->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(5, pointLightResource.Get()->GetGPUVirtualAddress());
 			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
 
